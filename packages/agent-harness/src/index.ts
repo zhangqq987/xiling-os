@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { AgentInputAttachment, AgentStreamEvent } from "@xiling/contracts";
 
@@ -326,7 +326,7 @@ const migrations = [{
 export class SqliteAgentSessionStore {
   private readonly sqlite: DatabaseSync;
 
-  constructor(path: string) {
+  constructor(private readonly path: string) {
     mkdirSync(dirname(path), { recursive: true });
     this.sqlite = new DatabaseSync(path);
     this.sqlite.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
@@ -335,10 +335,27 @@ export class SqliteAgentSessionStore {
 
   close(): void { this.sqlite.close(); }
 
+  private backupBeforeMigration(current: number): void {
+    if (current >= AGENT_STORE_SCHEMA_VERSION) return;
+    const path = this.path;
+    if (!existsSync(path)) return;
+    const backupDir = join(dirname(path), "backups");
+    mkdirSync(backupDir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const base = basename(path);
+    for (const suffix of ["", "-wal", "-shm"] as const) {
+      const source = `${path}${suffix}`;
+      if (existsSync(source)) copyFileSync(source, join(backupDir, `${base}${suffix}.${stamp}.bak`));
+    }
+    const backups = readdirSync(backupDir).filter((name) => name.startsWith(`${base}.`) && name.endsWith(".bak")).sort();
+    for (const name of backups.slice(0, Math.max(0, backups.length - 5))) rmSync(join(backupDir, name));
+  }
+
   private migrate(): void {
     const row = this.sqlite.prepare("PRAGMA user_version").get() as { user_version: number };
     let current = row.user_version;
     if (current > AGENT_STORE_SCHEMA_VERSION) throw new Error(`Agent store version ${current} is newer than supported ${AGENT_STORE_SCHEMA_VERSION}`);
+    this.backupBeforeMigration(current);
     for (const migration of migrations) {
       if (migration.version <= current) continue;
       this.transaction(() => {

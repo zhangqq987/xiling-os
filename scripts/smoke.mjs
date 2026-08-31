@@ -12,6 +12,7 @@ const commands = [
   ["node", ["scripts/mcp-adapter-smoke.mjs"]],
   ["node", ["scripts/research-graph-smoke.mjs"]],
   ["node", ["scripts/platform-smoke.mjs"]],
+  ["node", ["scripts/ui-dom-smoke.mjs"]],
   ["node", ["scripts/web-human-factors-check.mjs"]],
 ];
 

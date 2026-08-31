@@ -32,3 +32,9 @@ credentials.enc.json
 *.pem
 *.p12
 *.pfx
+
+# Python 运行时与缓存（services/runner）
+services/runner/venv/
+services/runner/.venv/
+__pycache__/
+*.pyc

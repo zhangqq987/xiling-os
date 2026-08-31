@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-sqlite";
 import type { CanvasBranchContext, ChatSessionSummary, ContextCapsule, EvidenceRecord, ResearchProject, PaperRecord, ProjectItem, ProjectItemKind, ProjectItemStatus, ProjectStatus, ResourceUri, WikiPageDetail, WikiPageRevision, WikiPageSummary, WikiSearchResult } from "@xiling/contracts";
 import { chatSessionContexts, chatSessions, contextCapsules, evidence, projectItems, projects, wikiPages, wikiRevisions } from "./schema.js";
-import { runKnowledgeMigrations } from "./migrations.js";
+import { KNOWLEDGE_SCHEMA_VERSION, runKnowledgeMigrations } from "./migrations.js";
 import type { KnowledgeStore, ResearchProjectionOutboxRecord } from "./ports.js";
 
 const DEFAULT_PROJECT_ID = "ocean-heatwave";
@@ -28,12 +28,37 @@ function revisionFromRow(row: typeof wikiRevisions.$inferSelect): WikiPageRevisi
   return { ...row, artifactUris: JSON.parse(row.artifactUris) as ResourceUri[] };
 }
 
+/** 数据库即将跨 schema 版本迁移时，先把现有库文件（含 WAL/SHM）备份到同级 backups/ 目录，保留最近 5 份。 */
+function backupSqliteBeforeMigration(path: string, latestVersion: number): void {
+  if (!existsSync(path)) return;
+  let current = 0;
+  try {
+    const probe = new DatabaseSync(path, { readOnly: true });
+    current = (probe.prepare("PRAGMA user_version").get() as { user_version: number }).user_version ?? 0;
+    probe.close();
+  } catch {
+    return;
+  }
+  if (current >= latestVersion) return;
+  const backupDir = join(dirname(path), "backups");
+  mkdirSync(backupDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const base = basename(path);
+  for (const suffix of ["", "-wal", "-shm"] as const) {
+    const source = `${path}${suffix}`;
+    if (existsSync(source)) copyFileSync(source, join(backupDir, `${base}${suffix}.${stamp}.bak`));
+  }
+  const backups = readdirSync(backupDir).filter((name) => name.startsWith(`${base}.`) && name.endsWith(".bak")).sort();
+  for (const name of backups.slice(0, Math.max(0, backups.length - 5))) rmSync(join(backupDir, name));
+}
+
 export class KnowledgeService implements KnowledgeStore {
   private readonly sqlite: DatabaseSync;
   private readonly db;
 
   constructor(path: string) {
     mkdirSync(dirname(path), { recursive: true });
+    backupSqliteBeforeMigration(path, KNOWLEDGE_SCHEMA_VERSION);
     this.sqlite = new DatabaseSync(path);
     this.sqlite.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
     runKnowledgeMigrations(this.sqlite);

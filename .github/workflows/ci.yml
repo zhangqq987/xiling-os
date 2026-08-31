@@ -27,6 +27,22 @@ jobs:
       - if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with: { name: spdx-sbom, path: build/sbom.spdx.json }
+  # 真实渲染冒烟：构建产物在无头 Chromium 中启动，断言应用不进入错误边界。
+  # 这道防线拦截「合并后所有人都打不开」级别的回归（如 Provider 崩溃、样式缺失）。
+  ui-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11.19.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22.19.0, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm --filter @xiling/web build
+      - run: pnpm add -w playwright@1.55.0
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: node scripts/ui-dom-smoke.mjs
   # A real Windows acceptance lane must execute inside a WSL2 Linux runner.
   # Keep it opt-in so repositories without a registered self-hosted runner do
   # not leave pull requests queued forever. Set the repository variable
