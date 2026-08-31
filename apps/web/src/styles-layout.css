@@ -2106,3 +2106,6 @@
 
 /* ─── 科研画布：三栏布局下恢复画布高度（父容器为 block，画布壳需要显式高度） ─── */
 .workspace-body .scientific-canvas-shell { height: 100%; flex: 1; min-height: 0; }
+
+/* 非对话视图（科研画布、Wiki、文献图等）不渲染右侧产出面板，去掉预留的第三列，避免右侧大片空白 */
+.shell.shell-wide { grid-template-columns: var(--lx-sidebar-w) minmax(0, 1fr); }

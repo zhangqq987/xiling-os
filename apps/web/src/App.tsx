@@ -68,7 +68,7 @@ function WorkspaceApp() {
   if (!activeProject) return <main className="shell"><div className="view-loading">{error ?? "没有可用科研项目"}</div></main>;
 
   return (
-    <main className={`shell ${view === "settings" ? "settings-mode" : ""}`}>
+    <main className={`shell ${view === "settings" ? "settings-mode" : ""} ${view !== "chat" ? "shell-wide" : ""}`}>
       {view !== "settings" ? <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="brand-mark"><img src="/brand/xiling-mark.png" alt="" /></div>
