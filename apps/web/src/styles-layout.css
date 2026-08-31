@@ -2136,3 +2136,45 @@
 /* 降级态追问输入条：任何容器内都不悬浮遮挡画布 */
 .execution-canvas-composer-degraded { position: static !important; right: auto; transform: none; width: auto; margin: 10px 14px 14px; }
 .execution-canvas-composer-degraded textarea { min-height: 40px; }
+
+/* ─── 对话内查找：浮动查找条与命中高亮 ─── */
+.chat-search-bar {
+  position: absolute;
+  top: 58px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--lx-border);
+  border-radius: 10px;
+  background: var(--lx-bg-white);
+  box-shadow: var(--lx-shadow-sm);
+  z-index: 30;
+}
+
+.chat-search-bar input {
+  width: 220px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--lx-text);
+  font-size: 12px;
+}
+
+.chat-search-count { color: var(--lx-text-muted); font-size: 11px; white-space: nowrap; }
+
+.chat-search-bar button {
+  padding: 3px 8px;
+  border: 1px solid var(--lx-border);
+  border-radius: 6px;
+  background: var(--lx-bg);
+  color: var(--lx-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.chat-search-bar button:hover:not(:disabled) { border-color: var(--lx-primary); color: var(--lx-primary); }
+.chat-search-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.chat-search-hit { outline: 2px solid #e8a13c; outline-offset: 2px; border-radius: 8px; scroll-margin-top: 80px; }

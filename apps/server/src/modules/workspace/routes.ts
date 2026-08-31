@@ -80,6 +80,36 @@ export function registerWorkspaceRoutes(app: FastifyInstance, { knowledge, agent
       return { ...session, ...(summary ? { preview: summary.preview, messageCount: summary.messageCount, updatedAt: summary.lastEntryAt } : { preview: "", messageCount: 0 }) };
     }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   });
+  app.get("/api/v1/chat-sessions/search", async (request, reply) => {
+    const parsed = z.object({ projectId: z.string().min(1).max(120), q: z.string().min(1).max(200) }).safeParse(request.query);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues });
+    const { projectId, q } = parsed.data;
+    const sessions = knowledge.listChatSessions(projectId);
+    const summaries = agentSessions.chatSessionEntrySummaries(sessions.map(({ id }) => id));
+    const decorated = new Map(sessions.map((session) => {
+      const summary = summaries.get(session.id);
+      return [session.id, { ...session, ...(summary ? { preview: summary.preview, messageCount: summary.messageCount, updatedAt: summary.lastEntryAt } : { preview: "", messageCount: 0 }) }];
+    }));
+    const results: Array<{ id: string; projectId: string; title: string; preview: string; messageCount: number; updatedAt: string; matchedText?: string; matchedAt?: string }> = [];
+    const seen = new Set<string>();
+    // 内容命中优先（按匹配时间倒序）
+    for (const match of agentSessions.searchSessionEntries(projectId, q)) {
+      if (seen.has(match.sessionId)) continue;
+      const session = decorated.get(match.sessionId);
+      if (!session) continue;
+      seen.add(match.sessionId);
+      results.push({ ...session, matchedText: match.text.slice(0, 160), matchedAt: match.createdAt });
+    }
+    // 标题命中的会话补充在后面
+    for (const session of decorated.values()) {
+      if (seen.has(session.id)) continue;
+      if (session.title.toLocaleLowerCase().includes(q.toLocaleLowerCase())) {
+        seen.add(session.id);
+        results.push({ ...session });
+      }
+    }
+    return results;
+  });
   app.post("/api/v1/chat-sessions", async (request, reply) => {
     const parsed = chatSessionCreateSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues });

@@ -64,6 +64,15 @@ export function PaperGraphView({ projectId, onNavigate }: { projectId: string; o
       setActionStatus("已提升为项目证据，科研画布会自动更新");
     } else setActionStatus("证据提升失败");
   };
+  const deleteEvidence = async () => {
+    if (!selected || !selectedEvidence) return;
+    if (!window.confirm(`删除这条证据记录吗？（论文「${selected.title}」的引录与标注）`)) return;
+    const response = await fetch(`/api/v1/evidence/${encodeURIComponent(selectedEvidence.paper.id)}?projectId=${encodeURIComponent(projectId)}`, { method: "DELETE" });
+    if (response.ok) {
+      setEvidence((current) => current.filter((record) => record.paper.id !== selectedEvidence.paper.id));
+      setActionStatus("证据记录已删除");
+    } else setActionStatus("证据删除失败");
+  };
   const searchRemote = async () => {
     const normalized = query.trim(); if (normalized.length < 2) { setSearchStatus("请输入至少 2 个字符"); return; }
     setSearchStatus("正在检索 Semantic Scholar…"); setSearching(true);
@@ -187,6 +196,7 @@ export function PaperGraphView({ projectId, onNavigate }: { projectId: string; o
       <label className="paper-annotation compact"><span>适用限制</span><input aria-label="适用限制" placeholder="数据范围、方法限制或不确定性" value={selected ? limitationDrafts[selected.id] ?? "" : ""} onChange={(event) => { if (selected) setLimitationDrafts((current) => ({ ...current, [selected.id]: event.target.value })); }} /></label>
       <button className="paper-promote" disabled={!selected || !(selected && quoteDrafts[selected.id]?.trim())} onClick={() => void saveEvidence()}>{selectedEvidence ? "新增一条证据记录" : "提升为项目证据"}</button>
       {selectedEvidence ? <button onClick={() => onNavigate?.("canvas")}>在科研画布中查看 →</button> : null}
+      {selectedEvidence ? <button aria-label="删除该证据记录" title="删除该证据记录（不可恢复）" onClick={() => void deleteEvidence()}>删除该证据记录</button> : null}
       {actionStatus ? <p className="paper-action-status">{actionStatus}</p> : null}
       <div className="algorithm-note"><b>算法透明</b><p>{graph.algorithm}</p><small>{graph.nodes.length} nodes · {graph.edges.length} edges · {graph.fetchedAt}</small></div>
     </aside>

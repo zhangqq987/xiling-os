@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, like } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-sqlite";
 import type { CanvasBranchContext, ChatSessionSummary, ContextCapsule, EvidenceRecord, ResearchProject, PaperRecord, ProjectItem, ProjectItemKind, ProjectItemStatus, ProjectStatus, ResourceUri, WikiPageDetail, WikiPageRevision, WikiPageSummary, WikiSearchResult } from "@xiling/contracts";
 import { chatSessionContexts, chatSessions, contextCapsules, evidence, projectItems, projects, wikiPages, wikiRevisions } from "./schema.js";
@@ -307,6 +307,10 @@ export class KnowledgeService implements KnowledgeStore {
 
   listEvidence(projectId = DEFAULT_PROJECT_ID): EvidenceRecord[] {
     return this.db.select().from(evidence).where(eq(evidence.projectId, projectId)).orderBy(desc(evidence.createdAt)).all().map((row) => this.evidenceFromRow(row));
+  }
+
+  deleteEvidence(projectId: string, paperId: string): boolean {
+    return this.db.delete(evidence).where(and(eq(evidence.projectId, projectId), eq(evidence.paperId, paperId))).run().changes > 0;
   }
 
   private evidenceFromRow(row: typeof evidence.$inferSelect): EvidenceRecord {

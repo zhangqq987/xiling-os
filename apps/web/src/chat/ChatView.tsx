@@ -65,6 +65,19 @@ const AssistantMessage: FC = () => (
   </MessagePrimitive.Root>
 );
 
+const wikiTopicOf = (text: string): string => {
+  const rules: Array<[RegExp, string]> = [
+    [/内波|近惯性/i, "内波"],
+    [/热浪|marine heatwave/i, "海洋热浪"],
+    [/层结|混合层|浮力频率|密度跃层/i, "层结与混合"],
+    [/环流|黑潮|边界流|输运/i, "环流与输运"],
+    [/潮汐|潮流/i, "潮汐与潮流"],
+    [/数据|argo|再分析|数据集|下载/i, "数据与方法"],
+  ];
+  for (const [pattern, topic] of rules) if (pattern.test(text)) return topic;
+  return "综合讨论";
+};
+
 function extractText(content: readonly { type: string; text?: string }[]): string {
   return content.filter((part) => part.type === "text").map((part) => part.text ?? "").join("\n");
 }
@@ -93,6 +106,10 @@ export function ChatView({ project }: { project: ResearchProject }) {
   const [contextTrace, setContextTrace] = useState<ContextAssemblyTrace>();
   const [artifactWidth, setArtifactWidth] = useState(560);
   const [artifactOpen, setArtifactOpen] = useState(false);
+  const [chatSearchOpen, setChatSearchOpen] = useState(false);
+  const [chatSearchText, setChatSearchText] = useState("");
+  const [chatSearchTotal, setChatSearchTotal] = useState(0);
+  const [chatSearchIndex, setChatSearchIndex] = useState(0);
   const [artifactExpanded, setArtifactExpanded] = useState(false);
   const [workbenchWidth, setWorkbenchWidth] = useState(0);
   const [primaryMode, setPrimaryMode] = useState<"conversation" | "execution">("conversation");
@@ -100,6 +117,7 @@ export function ChatView({ project }: { project: ResearchProject }) {
   const artifactBeforeGraphRef = useRef(false);
   const manualArtifactOpenRef = useRef(false);
   const seenArtifactCountRef = useRef(0);
+  const chatSearchMatchesRef = useRef<HTMLElement[]>([]);
   const workbenchRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let cancelled = false;
@@ -146,6 +164,35 @@ export function ChatView({ project }: { project: ResearchProject }) {
     else if (artifactCount === 0 && !manualArtifactOpenRef.current) setArtifactOpen(false);
     seenArtifactCountRef.current = artifactCount;
   }, [artifactCount]);
+  const jumpToChatSearchMatch = useCallback((position: number) => {
+    const matches = chatSearchMatchesRef.current;
+    if (!matches.length) return;
+    const next = ((position - 1) % matches.length + matches.length) % matches.length + 1;
+    setChatSearchIndex(next);
+    const target = matches[next - 1]!;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.add("chat-search-hit");
+    window.setTimeout(() => target.classList.remove("chat-search-hit"), 1500);
+  }, []);
+  useEffect(() => {
+    const query = chatSearchText.trim().toLowerCase();
+    if (!chatSearchOpen || !query) { chatSearchMatchesRef.current = []; setChatSearchTotal(0); setChatSearchIndex(0); return; }
+    const matches = (Array.from(document.querySelectorAll(".aui-message")) as HTMLElement[]).filter((element) => (element.textContent ?? "").toLowerCase().includes(query));
+    chatSearchMatchesRef.current = matches;
+    setChatSearchTotal(matches.length);
+    setChatSearchIndex(matches.length ? 1 : 0);
+    if (matches.length) {
+      const target = matches[0]!;
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.classList.add("chat-search-hit");
+      window.setTimeout(() => target.classList.remove("chat-search-hit"), 1500);
+    }
+  }, [chatSearchText, chatSearchOpen, messages.length]);
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => { if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === "f" && primaryMode === "conversation") { event.preventDefault(); setChatSearchOpen(true); } };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [primaryMode]);
   const lastCompleteAssistantText = useMemo(() => [...messages].reverse().find((message) => message.role === "assistant" && message.status === "complete")?.text ?? "", [messages]);
   const choiceOptions = useMemo(() => {
     if (running) return [];
@@ -256,20 +303,38 @@ export function ChatView({ project }: { project: ResearchProject }) {
   const persistResponse = async (target: "task" | "wiki") => {
     if (!lastAssistant) return;
     setSaveStatus("正在保存…");
-    const title = `Agent 研究记录 · ${new Date().toLocaleString("zh-CN", { hour12: false })}`;
     try {
       if (target === "task") {
+        const title = `Agent 研究记录 · ${new Date().toLocaleString("zh-CN", { hour12: false })}`;
         const provenance = lastAssistant.runId ? `\n\n来源 Agent Run：${lastAssistant.runId}` : "";
         const response = await fetch("/api/v1/project-items", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: project.id, kind: "task", title, notes: `${lastAssistant.text.slice(0, 1_700)}${provenance}` }) });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         await response.json() as ProjectItem;
+        setSaveStatus("已保存到项目任务");
       } else if (target === "wiki") {
-        const provenance = lastAssistant.runId ? `\n\n---\n\n> 来源：Agent Run \`${lastAssistant.runId}\`。发布前请核对证据与结论。` : "";
-        const response = await fetch("/api/v1/wiki/pages", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: project.id, title, markdown: `# ${title}\n\n${lastAssistant.text}${provenance}` }) });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        await response.json() as WikiPageDetail;
+        const provenance = lastAssistant.runId ? `\n\n> 来源：Agent Run \`${lastAssistant.runId}\`。发布前请核对证据与结论。` : "";
+        const topic = wikiTopicOf(lastAssistant.text);
+        const wikiTitle = `${project.id === FREE_EXPLORATION_PROJECT_ID ? "自由探索" : "Agent 研究记录"} · ${topic}`;
+        const stamp = new Date().toLocaleString("zh-CN", { hour12: false });
+        const section = `## ${stamp}\n\n${lastAssistant.text}${provenance}`;
+        const pagesResponse = await fetch(`/api/v1/wiki/pages?projectId=${encodeURIComponent(project.id)}`);
+        const pages = pagesResponse.ok ? await pagesResponse.json() as Array<{ id: string; title: string }> : [];
+        const existing = pages.find((page) => page.title === wikiTitle);
+        if (existing) {
+          const detailResponse = await fetch(`/api/v1/wiki/pages/${encodeURIComponent(existing.id)}`);
+          if (!detailResponse.ok) throw new Error(`HTTP ${detailResponse.status}`);
+          const detail = await detailResponse.json() as WikiPageDetail;
+          const merged = `${detail.currentRevision.markdown}\n\n---\n\n${section}`;
+          const revised = await fetch(`/api/v1/wiki/pages/${encodeURIComponent(existing.id)}/revisions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ markdown: merged }) });
+          if (!revised.ok) throw new Error(`HTTP ${revised.status}`);
+          const updated = await revised.json() as WikiPageDetail;
+          setSaveStatus(`已追加到《${wikiTitle}》（第 ${updated.currentRevision.version} 版）`);
+        } else {
+          const created = await fetch("/api/v1/wiki/pages", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: project.id, title: wikiTitle, markdown: `# ${wikiTitle}\n\n${section}` }) });
+          if (!created.ok) throw new Error(`HTTP ${created.status}`);
+          setSaveStatus(`已创建 Wiki 页面《${wikiTitle}》`);
+        }
       }
-      setSaveStatus(target === "task" ? "已保存到项目任务" : "已创建 Wiki 页面");
       setPendingSaveTarget(undefined);
     } catch (cause) { setSaveStatus(`保存失败：${cause instanceof Error ? cause.message : String(cause)}`); }
   };
@@ -311,7 +376,29 @@ export function ChatView({ project }: { project: ResearchProject }) {
     <AssistantRuntimeProvider runtime={runtime}>
       <div className={`chat-workbench ${artifactExpanded ? "artifact-expanded" : ""} ${artifactOpen && !artifactDocked && !artifactExpanded ? "artifact-overlay" : ""}`} ref={workbenchRef} style={{ gridTemplateColumns: artifactExpanded || !artifactOpen || !artifactDocked ? "minmax(0, 1fr)" : `minmax(520px, 1fr) 7px ${artifactWidth}px` }}>
         <ThreadPrimitive.Root className="chat-view">
-          <div className="chat-heading"><div><small>{project.name} · {primaryMode === "conversation" ? "研究对话" : "Agent 可观测性"}</small><h1>{primaryMode === "conversation" ? activeSession?.title ?? "新对话" : "Agent 运行图"}</h1></div><div className="chat-heading-actions"><div className="chat-primary-switch"><button className={primaryMode === "conversation" ? "active" : ""} onClick={() => switchPrimaryMode("conversation")}>对话</button><button className={primaryMode === "execution" ? "active" : ""} onClick={() => switchPrimaryMode("execution")}>运行图</button></div>{primaryMode === "conversation" ? <label className={`chat-model-picker ${selectedModelKey ? "ready" : "blocked"}`} title={selectedModelKey ? "仅覆盖下一次 Chat 运行；子智能体仍按角色路由" : "请先在设置中连接模型 API"}><i /><select aria-label="本轮模型" disabled={running || !selectedModelKey} value={selectedModelKey} onChange={(event) => setSelectedModelKey(event.target.value)}>{!selectedModelKey ? <option value="">连接模型 API 后可切换</option> : null}{modelRuntime?.primary && !selectableModels.some((model) => model.providerId === modelRuntime.primary!.providerId && model.id === modelRuntime.primary!.modelId) ? <option value={`${modelRuntime.primary.providerId}::${modelRuntime.primary.modelId}`}>{modelRuntime.primary.selectedModel?.name ?? modelRuntime.primary.modelId}</option> : null}{selectableModels.map((model) => <option key={`${model.providerId}:${model.id}`} value={`${model.providerId}::${model.id}`}>{model.name} · {model.providerId}</option>)}</select></label> : null}{!artifactOpen && primaryMode === "conversation" ? <button onClick={() => { manualArtifactOpenRef.current = true; setArtifactOpen(true); }}>打开产物面板</button> : null}</div></div>
+          <div className="chat-heading"><div><small>{project.name} · {primaryMode === "conversation" ? "研究对话" : "Agent 可观测性"}</small><h1>{primaryMode === "conversation" ? activeSession?.title ?? "新对话" : "Agent 运行图"}</h1></div><div className="chat-heading-actions"><div className="chat-primary-switch"><button className={primaryMode === "conversation" ? "active" : ""} onClick={() => switchPrimaryMode("conversation")}>对话</button><button className={primaryMode === "execution" ? "active" : ""} onClick={() => switchPrimaryMode("execution")}>运行图</button></div>{primaryMode === "conversation" ? <label className={`chat-model-picker ${selectedModelKey ? "ready" : "blocked"}`} title={selectedModelKey ? "仅覆盖下一次 Chat 运行；子智能体仍按角色路由" : "请先在设置中连接模型 API"}><i /><select aria-label="本轮模型" disabled={running || !selectedModelKey} value={selectedModelKey} onChange={(event) => setSelectedModelKey(event.target.value)}>{!selectedModelKey ? <option value="">连接模型 API 后可切换</option> : null}{modelRuntime?.primary && !selectableModels.some((model) => model.providerId === modelRuntime.primary!.providerId && model.id === modelRuntime.primary!.modelId) ? <option value={`${modelRuntime.primary.providerId}::${modelRuntime.primary.modelId}`}>{modelRuntime.primary.selectedModel?.name ?? modelRuntime.primary.modelId}</option> : null}{selectableModels.map((model) => <option key={`${model.providerId}:${model.id}`} value={`${model.providerId}::${model.id}`}>{model.name} · {model.providerId}</option>)}</select></label> : null}{!artifactOpen && primaryMode === "conversation" ? <button onClick={() => { manualArtifactOpenRef.current = true; setArtifactOpen(true); }}>打开产物面板</button> : null}{primaryMode === "conversation" && messages.some((message) => message.role === "user") ? <button aria-label="导出当前对话为 Markdown" title="导出当前对话为 Markdown" onClick={() => {
+  const lines = [
+    `# ${activeSession?.title ?? "研究对话"}`,
+    "",
+    `- 项目：${project.name}`,
+    `- 导出时间：${new Date().toLocaleString("zh-CN", { hour12: false })}`,
+    "",
+    ...messages.filter((message) => message.role === "user" || message.text.trim()).flatMap((message) => [`## ${message.role === "user" ? "你" : "汐灵"}`, message.text]),
+  ];
+  const blob = new Blob([lines.join("\n\n")], { type: "text/markdown;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${(activeSession?.title ?? "研究对话").replace(/[\\/:*?"<>|]/g, "-")}.md`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}}>导出</button> : null}{primaryMode === "conversation" ? <button aria-label="在对话中查找" title="在对话中查找（Ctrl+F）" onClick={() => setChatSearchOpen(true)}>查找</button> : null}</div></div>
+          {chatSearchOpen && primaryMode === "conversation" ? <div className="chat-search-bar" role="search">
+            <input autoFocus aria-label="在对话中查找" placeholder="在对话中查找…" value={chatSearchText} onChange={(event) => setChatSearchText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); jumpToChatSearchMatch(event.shiftKey ? chatSearchIndex - 1 : chatSearchIndex + 1); } if (event.key === "Escape") { setChatSearchOpen(false); setChatSearchText(""); } }} />
+            <span className="chat-search-count">{chatSearchText.trim() ? (chatSearchTotal ? `${chatSearchIndex}/${chatSearchTotal}` : "无结果") : ""}</span>
+            <button aria-label="上一处" disabled={!chatSearchTotal} onClick={() => jumpToChatSearchMatch(chatSearchIndex - 1)}>↑</button>
+            <button aria-label="下一处" disabled={!chatSearchTotal} onClick={() => jumpToChatSearchMatch(chatSearchIndex + 1)}>↓</button>
+            <button aria-label="关闭查找" onClick={() => { setChatSearchOpen(false); setChatSearchText(""); }}>×</button>
+          </div> : null}
           {primaryMode === "execution" ? <AgentExecutionGraphView projectId={project.id} activeSessionId={activeSessionId} refreshKey={graphRefreshKey} onReturnToChat={() => switchPrimaryMode("conversation")} /> : <>
             <ThreadPrimitive.Viewport className="aui-thread">
               <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />

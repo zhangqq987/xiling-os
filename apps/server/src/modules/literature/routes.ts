@@ -32,12 +32,17 @@ export function registerLiteratureRoutes(app: FastifyInstance, dependencies: { l
       ));
     }
     const legacy = paperSchema.safeParse(request.body);
-    return legacy.success ? reply.code(201).send(dependencies.evidence.saveEvidence("ocean-heatwave", toPaperRecord(legacy.data))) : reply.code(400).send({ error: scoped.error.issues });
+    return legacy.success ? reply.code(400).send({ error: "证据必须指定所属项目：请使用带 projectId 的 scoped paper 格式" }) : reply.code(400).send({ error: scoped.error.issues });
   });
   app.post("/api/v1/evidence/:paperId", async (request, reply) => {
     const params = paperParamsSchema.safeParse(request.params); const query = projectIdQuerySchema.safeParse(request.query);
     if (!params.success || !query.success) return reply.code(400).send({ error: "invalid evidence request" });
     const paper = createOceanHeatwaveFixture().papers.find((item) => item.id === params.data.paperId);
     return paper ? reply.code(201).send(dependencies.evidence.saveEvidence(query.data.projectId, paper)) : reply.code(404).send({ error: "Paper not found" });
+  });
+  app.delete("/api/v1/evidence/:paperId", async (request, reply) => {
+    const params = paperParamsSchema.safeParse(request.params); const query = projectIdQuerySchema.safeParse(request.query);
+    if (!params.success || !query.success) return reply.code(400).send({ error: "invalid evidence request" });
+    return dependencies.evidence.deleteEvidence(query.data.projectId, params.data.paperId) ? { status: "deleted" } : reply.code(404).send({ error: "Evidence not found" });
   });
 }

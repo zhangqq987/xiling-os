@@ -52,6 +52,21 @@ function WorkspaceApp() {
   const projectMenuRef = useRef<HTMLDivElement>(null);
   const { projects, activeProject, activeProjectId, setActiveProjectId, refreshProjects, loading, error } = useWorkspace();
   const { sessions, activeSessionId, loading: sessionsLoading, selectSession, startNewConversation, deleteSession } = useConversations();
+  const [sessionSearch, setSessionSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<Array<{ id: string; title: string; matchedText?: string }>>([]);
+
+  useEffect(() => {
+    const query = sessionSearch.trim();
+    if (query.length < 2) { setSearchResults([]); return; }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void fetch(`/api/v1/chat-sessions/search?projectId=${encodeURIComponent(activeProjectId)}&q=${encodeURIComponent(query)}`, { signal: controller.signal })
+        .then((response) => response.ok ? response.json() : [])
+        .then((items: Array<{ id: string; title: string; matchedText?: string }>) => { if (!controller.signal.aborted) setSearchResults(items); })
+        .catch(() => undefined);
+    }, 350);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [sessionSearch, activeProjectId]);
 
   useEffect(() => {
     if (!projectMenuOpen) return;
@@ -68,7 +83,7 @@ function WorkspaceApp() {
   if (!activeProject) return <main className="shell"><div className="view-loading">{error ?? "没有可用科研项目"}</div></main>;
 
   return (
-    <main className={`shell ${view === "settings" ? "settings-mode" : ""}`}>
+    <main className={`shell ${view === "settings" ? "settings-mode" : ""} ${view !== "chat" ? "shell-wide" : ""}`}>
       {view !== "settings" ? <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="brand-mark"><img src="/brand/xiling-mark.png" alt="" /></div>
@@ -99,7 +114,19 @@ function WorkspaceApp() {
         </nav>
         <div className="recent-work">
           <header><small>对话历史</small>{sessions.length ? <span>{sessions.length}</span> : null}</header>
-          {sessionsLoading ? <p className="session-loading">正在恢复…</p> : sessions.length ? (
+          <input className="session-search" placeholder="搜索会话与消息内容…" value={sessionSearch} onChange={(event) => setSessionSearch(event.target.value)} />
+          {sessionsLoading ? <p className="session-loading">正在恢复…</p> : searchResults.length ? (
+            <div className="session-list">
+              {searchResults.map((session) => (
+                <div className={`session-item session-match ${view === "chat" && session.id === activeSessionId ? "active" : ""}`} key={session.id}>
+                  <button onClick={() => { selectSession(session.id); setView("chat"); }}>
+                    <i>◆</i>
+                    <span><b>{session.title}</b>{session.matchedText ? <small className="session-snippet">{session.matchedText}</small> : <small>包含匹配内容</small>}</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : sessions.length && sessionSearch.trim() ? <p className="session-empty">没有匹配「{sessionSearch.trim()}」的会话</p> : sessions.length ? (
             <div className="session-list">
               {sessions.map((session) => (
                 <div className={`session-item ${view === "chat" && session.id === activeSessionId ? "active" : ""}`} key={session.id}>

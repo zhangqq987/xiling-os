@@ -41,6 +41,7 @@ export interface WikiStore {
 export interface EvidenceStore {
   saveEvidence(projectId: string, paper: PaperRecord, note?: string, stance?: EvidenceRecord["stance"], confidence?: number, source?: Pick<EvidenceRecord, "sourceQuote" | "sourceLocator" | "limitations" | "claimRevisionId">): EvidenceRecord;
   listEvidence(projectId?: string): EvidenceRecord[];
+  deleteEvidence(projectId: string, paperId: string): boolean;
 }
 export interface ResearchProjectionOutboxRecord {
   id: string;

@@ -610,6 +610,12 @@ export class SqliteAgentSessionStore {
     return new Map(rows.map((row) => [row.session_id, { preview: row.text.slice(0, 120), messageCount: row.message_count, lastEntryAt: row.created_at }]));
   }
 
+  /** 在项目内按消息全文检索（user/assistant 条目），按匹配时间倒序返回去重前的原始命中。 */
+  searchSessionEntries(projectId: string, query: string, limit = 40): Array<{ sessionId: string; text: string; createdAt: string }> {
+    const rows = this.sqlite.prepare(`SELECT e.session_id AS session_id, e.text, e.created_at AS created_at FROM agent_entries e JOIN agent_sessions s ON e.session_id = s.id WHERE s.project_id = ? AND s.status != 'archived' AND e.role IN ('user', 'assistant') AND e.text LIKE ? ORDER BY e.created_at DESC LIMIT ?`).all(projectId, `%${query}%`, limit) as Array<{ session_id: string; text: string; created_at: string }>;
+    return rows.map((row) => ({ sessionId: row.session_id, text: row.text, createdAt: row.created_at }));
+  }
+
   getEntry(id: string): AgentSessionEntry | undefined {
     const row = this.sqlite.prepare("SELECT session_id FROM agent_entries WHERE id = ?").get(id) as { session_id: string } | undefined;
     return row ? this.listSessionEntries(row.session_id).find((entry) => entry.id === id) : undefined;
