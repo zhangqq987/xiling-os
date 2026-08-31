@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FC } from "react";
 import type { AgentInputAttachment, ChatMessageRecord, ContextAssemblyTrace, ResearchProject, ModelCatalogEntry, ModelProviderId, ModelRuntimeStatus, ProjectItem, WikiPageDetail } from "@xiling/contracts";
+import { FREE_EXPLORATION_PROJECT_ID } from "@xiling/contracts";
 import type { ProjectResearchWorkflow } from "@xiling/domain-ocean";
 import { useConversations } from "../workspace/ConversationContext.js";
 import { ResearchWorkflowCard } from "./ResearchWorkflowCard.js";
@@ -28,7 +29,7 @@ type UiMessage = {
   runId?: string;
   attachments?: Array<AgentInputAttachment & { url: string }>;
 };
-const welcomeMessage = (project: ResearchProject): UiMessage => ({ id: `welcome-${project.id}`, role: "assistant", text: `已进入项目“${project.name}”。当前研究问题：${project.researchQuestion}`, status: "complete" });
+const welcomeMessage = (project: ResearchProject): UiMessage => ({ id: `welcome-${project.id}`, role: "assistant", text: project.id === FREE_EXPLORATION_PROJECT_ID ? "已进入「自由探索」模式。你可以直接询问任何物理海洋学问题——环流、层结、混合、热浪、内波、潮汐、数据与方法等，不需要围绕某个固定研究问题。工具与文献检索仍然可用，涉及写入或下载的操作依旧需要你确认。" : `已进入项目“${project.name}”。当前研究问题：${project.researchQuestion}`, status: "complete" });
 type ToolActivity = { callId: string; name: string; status: "running" | "complete" | "failed" };
 
 const CHOICE_FENCE_COMPLETE = /```xiling-choices\s*\n([\s\S]*?)```/g;

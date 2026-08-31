@@ -3,6 +3,9 @@ export type ResourceUri =
   | `artifact://${string}`
   | `dataset://${string}`;
 
+/** 内置「自由探索」项目：自动播种的开放问答模式，不绑定单一研究问题。 */
+export const FREE_EXPLORATION_PROJECT_ID = "free-exploration";
+
 export type ArtifactLifecycle = "staging" | "available" | "quarantined" | "archived";
 
 export interface ArtifactRecord {

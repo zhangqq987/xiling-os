@@ -52,9 +52,9 @@ export class KnowledgeService implements KnowledgeStore {
     return row ? projectFromRow(row) : undefined;
   }
 
-  createProject(input: { name: string; description: string; researchQuestion: string; domainIds: string[] }): ResearchProject {
+  createProject(input: { id?: string; name: string; description: string; researchQuestion: string; domainIds: string[] }): ResearchProject {
     const timestamp = now();
-    const value: typeof projects.$inferInsert = { id: randomUUID(), ...input, domainIds: JSON.stringify(input.domainIds), status: "active", createdAt: timestamp, updatedAt: timestamp };
+    const value: typeof projects.$inferInsert = { id: input.id ?? randomUUID(), name: input.name, description: input.description, researchQuestion: input.researchQuestion, domainIds: JSON.stringify(input.domainIds), status: "active", createdAt: timestamp, updatedAt: timestamp };
     const project = projectFromRow(value as typeof projects.$inferSelect);
     this.transaction(() => {
       this.db.insert(projects).values(value).run();

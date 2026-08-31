@@ -7,7 +7,7 @@ import type {
 export interface ProjectStore {
   listProjects(): ResearchProject[];
   getProject(id: string): ResearchProject | undefined;
-  createProject(input: { name: string; description: string; researchQuestion: string; domainIds: string[] }): ResearchProject;
+  createProject(input: { id?: string; name: string; description: string; researchQuestion: string; domainIds: string[] }): ResearchProject;
   updateProject(id: string, patch: Partial<Pick<ResearchProject, "name" | "description" | "researchQuestion" | "domainIds" | "status">>): ResearchProject | undefined;
 }
 export interface ProjectItemStore {

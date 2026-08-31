@@ -333,7 +333,7 @@ button { color: inherit; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid rgba(61,126,224,.58); outline-offset: 2px; }
 * { scrollbar-color: #c8d3e1 transparent; scrollbar-width: thin; }
 .shell { grid-template-columns: 238px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); background: var(--paper); }
-.sidebar { position: relative; min-height: 0; overflow: hidden; padding: 18px 13px 14px; color: var(--ink); background: linear-gradient(180deg, #fbfdff 0%, #f8faff 52%, #fbfcfe 100%); border-right: 1px solid #dde5f0; }
+.sidebar { position: relative; min-height: 0; overflow: visible; padding: 18px 13px 14px; color: var(--ink); background: linear-gradient(180deg, #fbfdff 0%, #f8faff 52%, #fbfcfe 100%); border-right: 1px solid #dde5f0; }
 .sidebar::before { content: ""; position: absolute; width: 180px; height: 180px; top: -108px; left: -80px; border-radius: 50%; background: radial-gradient(circle, rgba(91,215,238,.18), transparent 68%); pointer-events: none; }
 .brand { position: relative; gap: 10px; margin: 0 7px 18px; font-size: 19px; font-weight: 650; letter-spacing: -.03em; }
 .brand > span { width: 40px; height: 40px; overflow: hidden; display: grid; place-items: center; border-radius: 13px; color: white; background: linear-gradient(145deg, rgba(255,255,255,.94), rgba(235,246,255,.88)); border: 1px solid rgba(168,205,239,.56); box-shadow: 0 8px 24px rgba(47,129,210,.13); }
@@ -352,6 +352,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .project-switcher-menu { position: absolute; top: calc(100% + 7px); left: 0; width: 310px; overflow: hidden; border: 1px solid #d5dfeb; border-radius: 13px; background: rgba(255,255,255,.98); box-shadow: 0 22px 55px rgba(27,54,91,.18); backdrop-filter: blur(20px); }
 .project-switcher-menu header { display: flex; align-items: center; justify-content: space-between; padding: 11px 12px 8px; }
 .project-switcher-menu header b { font-size: 11px; }.project-switcher-menu header small { color: #8b96a4; font-size: 8px; }
+.project-badge-free { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; color: #1f7a4d; background: #e2f6ec; font-size: 8px; font-style: normal; font-weight: 640; vertical-align: 1px; }
 .project-switcher-menu > div { max-height: 278px; overflow: auto; padding: 3px 6px 7px; }
 .project-switcher-menu > div > button { width: 100%; display: grid; grid-template-columns: 18px minmax(0,1fr); gap: 7px; padding: 9px 7px; border: 0; border-radius: 8px; background: transparent; text-align: left; }
 .project-switcher-menu > div > button:hover { background: #f2f6fb; }.project-switcher-menu > div > button.active { background: #edf4fd; }
