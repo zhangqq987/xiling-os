@@ -2103,3 +2103,6 @@
 .output-panel .execution-canvas-composer { position: static; width: auto; transform: none; margin: 10px 14px 14px; }
 .output-panel .execution-canvas-composer textarea { min-height: 40px; }
 .output-panel .execution-reference-tray button { max-width: 100%; }
+
+/* ─── 科研画布：三栏布局下恢复画布高度（父容器为 block，画布壳需要显式高度） ─── */
+.workspace-body .scientific-canvas-shell { height: 100%; flex: 1; min-height: 0; }
