@@ -49,13 +49,23 @@ const relationColor: Record<ResearchRelationKind, string> = {
   HAS_VERSION: "#617e9a", TRANSITIONED_BY: "#89929a", ASSOCIATED_WITH: "#9b9a87", REFERENCES: "#7e8a91",
 };
 
+const formatNodeTime = (value?: string): string => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) return `更新于 ${date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+  return `更新于 ${date.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })}`;
+};
+
 function ScientificNodeCard({ data, selected }: NodeProps<ScientificNode>) {
+  const updatedLabel = formatNodeTime(data.updatedAt);
   return <article className={`scientific-node scientific-node-${data.kind.toLowerCase()} ${selected ? "selected" : ""}`}>
     <Handle type="target" position={Position.Top} isConnectable={false} />
     <header><span>{kindLabel[data.kind] ?? data.kind}</span>{data.status ? <i>{data.status}</i> : null}</header>
     <h3>{data.title}</h3>
     <p>{data.summary || "暂无摘要"}</p>
-    <footer><span>v{data.revision}</span>{data.confidence !== undefined ? <span>置信度 {Math.round(data.confidence * 100)}%</span> : null}</footer>
+    <footer><span>v{data.revision}</span>{data.confidence !== undefined ? <span>置信度 {Math.round(data.confidence * 100)}%</span> : null}{updatedLabel ? <span>{updatedLabel}</span> : null}</footer>
     <Handle type="source" position={Position.Bottom} isConnectable={false} />
   </article>;
 }

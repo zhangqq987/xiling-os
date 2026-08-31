@@ -2112,3 +2112,13 @@
 
 /* 对话/运行图：让 .chat-view 撑满工作台剩余高度（新布局下它是 flex 子项，需显式拉伸，否则执行图画布高度塌缩） */
 .chat-workbench .chat-view { flex: 1; min-height: 0; }
+
+/* ─── 侧边栏可读性：字号从过小的 8–10px 提升到舒适区间 ─── */
+.sidebar-brand .brand-text small { font-size: 10px; }
+.nav-group-title { font-size: 10.5px; }
+.nav-group button { font-size: 13.5px; }
+.recent-work header small { font-size: 10.5px; }
+.recent-work header span { font-size: 11px; }
+.session-item i { font-size: 10px; }
+.session-item span b { font-size: 13px; }
+.session-item span small { font-size: 11px; }
