@@ -2109,3 +2109,6 @@
 
 /* 非对话视图（科研画布、Wiki、文献图等）不渲染右侧产出面板，去掉预留的第三列，避免右侧大片空白 */
 .shell.shell-wide { grid-template-columns: var(--lx-sidebar-w) minmax(0, 1fr); }
+
+/* 对话/运行图：让 .chat-view 撑满工作台剩余高度（新布局下它是 flex 子项，需显式拉伸，否则执行图画布高度塌缩） */
+.chat-workbench .chat-view { flex: 1; min-height: 0; }
